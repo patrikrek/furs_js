@@ -1,0 +1,197 @@
+openapi: 3.0.3
+info:
+  title: Swagger Petstore - OpenAPI 3.0
+  description: |-
+    Express.js API for invoice verification in Slovenia (FURS). Test certificate by FURS is required for usage.
+  version: 1.0.0
+externalDocs:
+  description: GitHub Repository
+  url: https://github.com/patrikrek/furs_js
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: furs
+    description: Finančna uprava Republike Slovenije
+    externalDocs:
+      description: Tehnična dokumentacija
+      url: http://www.datoteke.fu.gov.si/dpr/files/TehnicnaDokumentacijaVer2.5.pdf
+  
+  
+  
+paths:
+  /:
+    get:
+      tags:
+        - furs
+      summary: Echo
+      description: Echo request for testing connection to FURS
+      responses:
+        '200':
+          description: Successful connection
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Echo'          
+        '500':
+          description: Connection error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /register:
+    post:
+      tags:
+        - furs
+      summary: Register business premise
+      description: 'Registering business premise is necessary before issuing invoices'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [BusinessPremiseID, CadastralNumber, BuildingNumber, BuildingSectionNumber, Street, HouseNumber, Community, City, PostalCode]
+              properties:
+                BusinessPremiseID:
+                  type: string
+                  example: "FERI0"
+                CadastralNumber:
+                  type: integer
+                  example: 658
+                BuildingNumber:
+                  type: integer
+                  example: 2213
+                BuildingSectionNumber:
+                  type: integer
+                  example: 1
+                Street:
+                  type: string
+                  example: "Koroška cesta"
+                HouseNumber:
+                  type: string
+                  example: "46"
+                HouseNumberAdditional:
+                  type: string
+                  example: "A"            
+                Community:
+                  type: string
+                  example: "Maribor"
+                City:
+                  type: string
+                  example: "Maribor"
+                PostalCode:
+                  type: string
+                  example: "2000"
+                
+      responses:
+        '200':
+          description: Successful registration of premise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessPremiseResponse'          
+        '500':
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /invoice:
+    post:
+      tags:
+        - furs
+      summary: Verify invoice at FURS
+      description: 'Invoice verification with FURS'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [BusinessPremiseID, ElectronicDeviceID, InvoiceNumber, InvoiceAmount, TaxRate, TaxableAmount, TaxAmount]
+              properties:
+                BusinessPremiseID:
+                  type: string
+                  example: "FERI0"
+                ElectronicDeviceID:
+                  type: string
+                  example: "EPDP0"
+                InvoiceNumber:
+                  type: string
+                  example: "1"
+                InvoiceAmount:
+                  type: number
+                  example: 1.11
+                TaxRate:
+                  type: number
+                  example: 22.00
+                TaxableAmount:
+                  type: number
+                  example: 0.91
+                TaxAmount:
+                  type: number
+                  example: 0.20
+                
+      responses:
+        '200':
+          description: Successful verification of invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response'          
+        '500':
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Echo:
+      type: object
+      properties:
+        EchoRequest:
+          type: string
+          example: "furs"
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Verification error"
+    BusinessPremiseResponse:
+      type: object
+      properties:
+        Header:
+          type: object
+          properties:
+            MessageID:
+                type: string
+                format: uuid
+                example: "6b26ccff-192f-4f57-8885-13b0393e5814"
+            DateTime:
+                type: string
+                format: date-time
+                example: "2023-02-17T15:20:58"
+
+    response:
+      type: object
+      properties:
+        InvoiceResponse:
+          type: object
+          properties:
+            Header:
+              type: object
+              properties:
+                MessageID:
+                  type: string
+                  format: uuid
+                  example: "3bd6625e-b341-4797-b053-7558a7c110d4"
+                DateTime:
+                  type: string
+                  format: date-time
+                  example: "2023-02-17T14:23:07"
+            UniqueInvoiceID:
+              type: string
+              example: "7644c762-8ca0-42d9-bf04-8028ceb9c9fb"
+        ZOI:
+          type: string
+          example: "e196da5bceefebd2871f987d7ae1fa43"

@@ -13,7 +13,9 @@ import hexToDecimal from 'biguint-format';
 import jsrsasign from 'jsrsasign';
 import * as Url from 'url';
 import bodyParser from 'body-parser';
-import dotenv from 'dotenv'
+import dotenv from 'dotenv';
+import swaggerUi from 'swagger-ui-express';
+import swaggerDocument from './openapi.json' assert {type: 'json'};
 
 dotenv.config()
 
@@ -35,6 +37,8 @@ app.use(bodyParser.urlencoded({ extended: false }))
 
 // parse application/json
 app.use(bodyParser.json())
+
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 const httpsAgent = new https.Agent({
     rejectUnauthorized: false,
@@ -136,19 +140,24 @@ cnTypes.forEach(t => {
 
 const getToken = async (payload) => {
 
-    // Validate payload
-    let schema = path.resolve(__dirname, 'FiscalVerificationSchema.json');
-    schema = JSON.parse(fs.readFileSync(schema));
-    const validation = validate(payload, schema);
+    try {
+        // Validate payload
+        let schema = path.resolve(__dirname, 'FiscalVerificationSchema.json');
+        schema = JSON.parse(fs.readFileSync(schema));
+        const validation = validate(payload, schema);
 
-    if (!!validation.errors && validation.errors.length) {
-        console.log(validation.errors);
-        throw (validation.errors);
+        if (!!validation.errors && validation.errors.length) {
+            console.log(validation.errors);
+            throw (validation.errors);
+        }
+
+        // Generate JWT
+        let token = jsonwebtoken.sign(payload, key, { header, algorithm: 'RS256', noTimestamp: true });
+        return token;
+    } catch (error) {
+        return null;
     }
 
-    // Generate JWT
-    let token = jsonwebtoken.sign(payload, key, { header, algorithm: 'RS256', noTimestamp: true });
-    return token;
 }
 
 
@@ -205,6 +214,8 @@ app.post('/register', async (req, res) => {
 
     try {
         let token = await getToken(premise);
+        if (token == null)
+            throw ("Napaka pri validaciji");
         let odg = await axios.post(`${url}/invoices/register`, { token }, {
             httpsAgent, headers: {
                 'Content-Type': 'application/json; UTF-8',
@@ -214,7 +225,7 @@ app.post('/register', async (req, res) => {
         res.json(response);
     } catch (error) {
         console.log(error);
-        res.json({ "error": error.response.data })
+        res.json({ "error": error })
     }
 });
 
@@ -277,6 +288,8 @@ app.post('/invoice', async (req, res) => {
     };
     try {
         let token = await getToken(invoice);
+        if (token == null)
+            throw ("Napaka pri validaciji");
         let odg = await axios.post(`${url}/invoices`, { token }, {
             httpsAgent, headers: {
                 'Content-Type': 'application/json; UTF-8',
@@ -286,7 +299,7 @@ app.post('/invoice', async (req, res) => {
         res.json({ response, ZOI });
     } catch (error) {
         console.log(error);
-        res.json({ "error": error.response.data })
+        res.status(500).json({ "error": error })
     }
 
 
