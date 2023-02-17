@@ -45,12 +45,12 @@ const httpsAgent = new https.Agent({
     ca: fs.readFileSync("./blagajne-test.fu.gov.si.cer"),
     // ca: fs.readFileSync("./ca.pem"),
     minVersion: "TLSv1.2",
-    pfx: fs.readFileSync(`./${process.env.TAXNUMBER}-1.p12`),
-    passphrase: process.env.PASSPHRASE,
+    pfx: fs.readFileSync(`./10596631-1.p12`),
+    passphrase: "3WTOPOGY2CN9",
     json: true
 });
 
-const TaxNumber = parseInt(process.env.TAXNUMBER);
+const TaxNumber = 10596631;
 
 // Parse pem and data from p12
 let key;
@@ -181,7 +181,7 @@ app.post('/register', async (req, res) => {
         BusinessPremiseRequest: {
             Header: {
                 MessageID: uuidv4(),
-                DateTime: moment().format(dtf),
+                DateTime: moment().utc().format(dtf),
             },
             BusinessPremise: {
                 TaxNumber,
@@ -204,7 +204,7 @@ app.post('/register', async (req, res) => {
                     }
                 },
                 // ValidityDate: moment().format('Y-MM-DD'),
-                ValidityDate: moment().format(dtf),
+                ValidityDate: moment().utc().format(dtf),
                 SoftwareSupplier: [{
                     TaxNumber
                 }],
@@ -238,9 +238,7 @@ const generateZOI = async (IssueDateTime, InvoiceNumber, BusinessPremiseID, Elec
     let sig = new jsrsasign.KJUR.crypto.Signature({ alg: 'SHA256withRSA' });
     sig.init(key);
     sig.updateString(ZOI);
-
-    ZOI = md5(sig.sign);
-
+    ZOI = md5(sig.sign());
     console.log('ZOI:', ZOI);
 
     return ZOI;
@@ -252,7 +250,7 @@ app.post('/invoice', async (req, res) => {
     const { BusinessPremiseID, ElectronicDeviceID, InvoiceNumber, InvoiceAmount, TaxRate, TaxableAmount, TaxAmount } = req.body;
 
 
-    const IssueDateTime = moment().utc().format(dtf);
+    const IssueDateTime = moment().format(dtf);
 
     const ZOI = await generateZOI(IssueDateTime, InvoiceNumber, BusinessPremiseID, ElectronicDeviceID, InvoiceAmount);
 
