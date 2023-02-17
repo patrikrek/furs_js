@@ -13,9 +13,13 @@ import hexToDecimal from 'biguint-format';
 import jsrsasign from 'jsrsasign';
 import * as Url from 'url';
 import bodyParser from 'body-parser';
+import dotenv from 'dotenv'
+
+dotenv.config()
 
 const __filename = Url.fileURLToPath(import.meta.url);
 const __dirname = Url.fileURLToPath(new URL('.', import.meta.url));
+
 
 const url = 'https://blagajne-test.fu.gov.si:9002/v1/cash_registers';
 const dtf = 'Y-MM-DD[T]HH:mm:ss[Z]';
@@ -37,12 +41,12 @@ const httpsAgent = new https.Agent({
     ca: fs.readFileSync("./blagajne-test.fu.gov.si.cer"),
     // ca: fs.readFileSync("./ca.pem"),
     minVersion: "TLSv1.2",
-    pfx: fs.readFileSync("./10596631-1.p12"),
-    passphrase: "3WTOPOGY2CN9",
+    pfx: fs.readFileSync(`./${process.env.TAXNUMBER}-1.p12`),
+    passphrase: process.env.PASSPHRASE,
     json: true
 });
 
-const TaxNumber = 10596631;
+const TaxNumber = parseInt(process.env.TAXNUMBER);
 
 // Parse pem and data from p12
 let key;
@@ -142,8 +146,6 @@ const getToken = async (payload) => {
         throw (validation.errors);
     }
 
-    console.log(header);
-
     // Generate JWT
     let token = jsonwebtoken.sign(payload, key, { header, algorithm: 'RS256', noTimestamp: true });
     return token;
@@ -200,7 +202,6 @@ app.post('/register', async (req, res) => {
             }
         }
     }
-    console.log(JSON.stringify(premise))
 
     try {
         let token = await getToken(premise);
@@ -215,7 +216,81 @@ app.post('/register', async (req, res) => {
         console.log(error);
         res.json({ "error": error.response.data })
     }
-})
+});
+
+const generateZOI = async (IssueDateTime, InvoiceNumber, BusinessPremiseID, ElectronicDeviceID, InvoiceAmount) => {
+
+    // Generate ZOI value
+    let ZOI = '' + TaxNumber + IssueDateTime + InvoiceNumber + BusinessPremiseID + ElectronicDeviceID +
+        InvoiceAmount;
+
+    let sig = new jsrsasign.KJUR.crypto.Signature({ alg: 'SHA256withRSA' });
+    sig.init(key);
+    sig.updateString(ZOI);
+
+    ZOI = md5(sig.sign);
+
+    console.log('ZOI:', ZOI);
+
+    return ZOI;
+}
+
+
+app.post('/invoice', async (req, res) => {
+
+    const { BusinessPremiseID, ElectronicDeviceID, InvoiceNumber, InvoiceAmount, TaxRate, TaxableAmount, TaxAmount } = req.body;
+
+
+    const IssueDateTime = moment().utc().format(dtf);
+
+    const ZOI = await generateZOI(IssueDateTime, InvoiceNumber, BusinessPremiseID, ElectronicDeviceID, InvoiceAmount);
+
+
+    const invoice = {
+        InvoiceRequest: {
+            Header: {
+                MessageID: uuidv4(),
+                DateTime: IssueDateTime
+            },
+            Invoice: {
+                TaxNumber,
+                IssueDateTime,
+                NumberingStructure: 'B',
+                InvoiceIdentifier: {
+                    BusinessPremiseID,
+                    ElectronicDeviceID,
+                    InvoiceNumber
+                },
+                InvoiceAmount,
+                PaymentAmount: InvoiceAmount,
+                TaxesPerSeller: [{
+                    VAT: [{
+                        TaxRate,
+                        TaxableAmount,
+                        TaxAmount,
+                    }]
+                }],
+                OperatorTaxNumber: TaxNumber,
+                ProtectedID: ZOI,
+            }
+        }
+    };
+    try {
+        let token = await getToken(invoice);
+        let odg = await axios.post(`${url}/invoices`, { token }, {
+            httpsAgent, headers: {
+                'Content-Type': 'application/json; UTF-8',
+            }
+        });
+        const response = jsonwebtoken.verify(odg.data.token, fs.readFileSync(fursCertPemFile), { algorithms: ['RS256'] });
+        res.json({ response, ZOI });
+    } catch (error) {
+        console.log(error);
+        res.json({ "error": error.response.data })
+    }
+
+
+});
 
 app.listen(3000);
 console.log("Listening on port 3000!");

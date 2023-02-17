@@ -10,3 +10,4 @@ To start, run `yarn start` or `npm start` in terminal.
 Server will start on `localhost:3000` with these endpoints:
 * `GET /` - echo request to FURS IS
 * `POST /register` - register premise
+* `POST /invoice` - verify invoice at FURS

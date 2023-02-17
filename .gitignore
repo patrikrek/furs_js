@@ -3,3 +3,4 @@
 *.key
 *.p12
 node_modules
+.env
