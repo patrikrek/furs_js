@@ -203,7 +203,7 @@ app.post('/register', async (req, res) => {
     console.log(JSON.stringify(premise))
 
     try {
-        let token = getToken(premise);
+        let token = await getToken(premise);
         let odg = await axios.post(`${url}/invoices/register`, { token }, {
             httpsAgent, headers: {
                 'Content-Type': 'application/json; UTF-8',
