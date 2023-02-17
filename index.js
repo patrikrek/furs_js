@@ -27,8 +27,8 @@ const url = 'https://blagajne-test.fu.gov.si:9002/v1/cash_registers';
 const dtf = 'Y-MM-DD[T]HH:mm:ss[Z]';
 
 const tlsCertFile = path.resolve(__dirname, 'blagajne-test.fu.gov.si.cer');
-const myCertFile = path.resolve(__dirname, '10596631-1.p12');
-const passphrase = '3WTOPOGY2CN9';
+const myCertFile = path.resolve(__dirname, `${process.env.TAXNUMBER}-1.p12`);
+const passphrase = process.env.PASSPHRASE;
 const fursCertPemFile = path.resolve(__dirname, 'DavPotRacTEST.cer');
 
 const app = express();
@@ -45,12 +45,12 @@ const httpsAgent = new https.Agent({
     ca: fs.readFileSync("./blagajne-test.fu.gov.si.cer"),
     // ca: fs.readFileSync("./ca.pem"),
     minVersion: "TLSv1.2",
-    pfx: fs.readFileSync(`./10596631-1.p12`),
-    passphrase: "3WTOPOGY2CN9",
+    pfx: fs.readFileSync(`./${process.env.TAXNUMBER}-1.p12`),
+    passphrase,
     json: true
 });
 
-const TaxNumber = 10596631;
+const TaxNumber = parseInt(process.env.TAXNUMBER);
 
 // Parse pem and data from p12
 let key;
@@ -250,7 +250,7 @@ app.post('/invoice', async (req, res) => {
     const { BusinessPremiseID, ElectronicDeviceID, InvoiceNumber, InvoiceAmount, TaxRate, TaxableAmount, TaxAmount } = req.body;
 
 
-    const IssueDateTime = moment().format(dtf);
+    const IssueDateTime = moment().utc().format(dtf);
 
     const ZOI = await generateZOI(IssueDateTime, InvoiceNumber, BusinessPremiseID, ElectronicDeviceID, InvoiceAmount);
 
